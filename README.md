@@ -33,20 +33,19 @@ Logger 名称禁止使用标准库保留名称 `root`。本包创建和同配置
 
 ## 安装
 
-本项目不发布到 PyPI，推荐从 GitHub 版本标签安装。将示例地址中的用户名替换为
-实际 GitHub 用户名。
+本项目不发布到 PyPI，推荐从 GitHub 版本标签安装。
 
 使用 uv：
 
 ```bash
-uv add git+https://github.com/<用户名>/tiny-struct-log.git --tag v0.1.0
+uv add git+https://github.com/HiRidgewalker/tiny-struct-log.git --tag V1.0.0
 ```
 
 使用 pip：
 
 ```bash
 python -m pip install \
-  "tiny-struct-log @ git+https://github.com/<用户名>/tiny-struct-log.git@v0.1.0"
+  "tiny-struct-log @ git+https://github.com/HiRidgewalker/tiny-struct-log.git@V1.0.0"
 ```
 
 建议依赖版本标签或完整 commit，不要让生产项目长期直接跟随 `main` 分支。这样上游
@@ -55,7 +54,7 @@ python -m pip install \
 也可以先克隆后安装：
 
 ```bash
-git clone https://github.com/<用户名>/tiny-struct-log.git
+git clone https://github.com/HiRidgewalker/tiny-struct-log.git
 cd tiny-struct-log
 
 # 使用 uv 创建环境、构建并安装当前包。
@@ -363,8 +362,8 @@ module-name = "tiny_struct_log"
 
 ```text
 dist/
-├── tiny_struct_log-0.1.0-py3-none-any.whl
-└── tiny_struct_log-0.1.0.tar.gz
+├── tiny_struct_log-1.0.0-py3-none-any.whl
+└── tiny_struct_log-1.0.0.tar.gz
 ```
 
 本包支持 Python 3.10～3.14，包元数据声明为 `>=3.10,<3.15`，运行时依赖为空。
