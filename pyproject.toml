@@ -1,0 +1,37 @@
+[project]
+name = "tiny-struct-log"
+version = "0.1.0"
+description = "基于 Python 标准库 logging 的微型结构化日志包"
+readme = "README.md"
+authors = [
+    { name = "limber", email = "1357644645@qq.com" }
+]
+requires-python = ">=3.10,<3.15"
+dependencies = []
+
+[build-system]
+requires = ["uv_build>=0.11.4,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# 显式声明使用 src layout，避免依赖 uv_build 的默认源码目录。
+module-root = "src"
+# 显式声明安装后的 Python 导入包名，避免根据项目名称自动推导。
+module-name = "tiny_struct_log"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "functional: 公开入口功能测试",
+    "unit: 独立规则单元测试",
+    "api: HTTP 接口测试",
+    "repository: 数据持久化测试",
+    "slow: 耗时测试",
+    "external: 真实外部服务测试",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
