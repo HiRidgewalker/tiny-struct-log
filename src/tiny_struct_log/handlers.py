@@ -12,7 +12,9 @@ class _LogOutputs:
     """聚合没有共享状态的 logging 输出构造操作。"""
 
     @staticmethod
-    def create_console(formatter: _JSONLineFormatter) -> logging.Handler:
+    def create_console(
+        formatter: _JSONLineFormatter, level: int
+    ) -> logging.Handler:
         """创建向标准输出写日志的终端 Handler。"""
 
         # 提前读取终端能力并构造 Formatter，避免检查失败时遗留已创建的 Handler。
@@ -21,7 +23,7 @@ class _LogOutputs:
             formatter, colors=sys.stdout.isatty()
         )
         handler = logging.StreamHandler(sys.stdout)
-        handler.setLevel(logging.INFO)
+        handler.setLevel(level)
         handler.setFormatter(console_formatter)
         return handler
 
@@ -31,6 +33,7 @@ class _LogOutputs:
         max_bytes: int,
         backup_count: int,
         formatter: _JSONLineFormatter,
+        level: int,
     ) -> RotatingFileHandler:
         """创建延迟打开、按大小轮转的 UTF-8 JSONL 文件 Handler。"""
 
@@ -45,6 +48,6 @@ class _LogOutputs:
             encoding="utf-8",
             delay=True,
         )
-        handler.setLevel(logging.INFO)
+        handler.setLevel(level)
         handler.setFormatter(formatter)
         return handler

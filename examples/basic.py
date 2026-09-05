@@ -14,6 +14,8 @@ def main() -> None:
         "general",
         console=True,
         persist=True,
+        console_level="debug",
+        persist_level="info",
         log_dir=log_dir,
         max_bytes=max_bytes,
         backup_count=backup_count,
@@ -22,11 +24,14 @@ def main() -> None:
         "pay",
         console=True,
         persist=True,
+        console_level="warning",
+        persist_level="info",
         log_dir=log_dir,
         max_bytes=max_bytes,
         backup_count=backup_count,
     )
 
+    general_logger.debug("终端调试信息不会写入持久化文件")
     general_logger.info(
         "服务启动完成",
         extra={"data": {"port": 8000}},

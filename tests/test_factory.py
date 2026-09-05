@@ -27,7 +27,12 @@ class TestLoggerFactoryFunctional:
         )
         assert first_logger is second_logger
         assert isinstance(first_logger, logging.Logger)
+        assert first_logger.level == logging.INFO
         assert len(first_logger.handlers) == 2
+        assert [handler.level for handler in first_logger.handlers] == [
+            logging.INFO,
+            logging.INFO,
+        ]
 
     def test_same_name_cannot_change_configuration(
         self, logger_name: str, tmp_path: Path
@@ -39,6 +44,17 @@ class TestLoggerFactoryFunctional:
             create_logger(
                 logger_name, console=False, persist=True,
                 log_dir=tmp_path, max_bytes=1024, backup_count=2,
+            )
+
+    def test_same_name_cannot_change_output_level(self, logger_name: str) -> None:
+        """同名 Logger 不能在创建后切换终端输出等级。"""
+
+        create_logger(
+            logger_name, console=True, persist=False, console_level="info"
+        )
+        with pytest.raises(ValueError, match="另一组配置"):
+            create_logger(
+                logger_name, console=True, persist=False, console_level="debug"
             )
 
     def test_create_logger_does_not_modify_root_logger(self, logger_name: str) -> None:
@@ -93,6 +109,90 @@ class TestLoggerFactoryFunctional:
             )
         with pytest.raises(ValueError, match="persist=False"):
             create_logger(logger_name, console=True, persist=False, log_dir="logs")
+
+    @pytest.mark.parametrize(
+        ("level_name", "expected_level"),
+        [
+            ("debug", logging.DEBUG),
+            ("info", logging.INFO),
+            ("warning", logging.WARNING),
+            ("error", logging.ERROR),
+            ("critical", logging.CRITICAL),
+        ],
+    )
+    def test_console_level_accepts_supported_lowercase_names(
+        self, logger_name: str, level_name: str, expected_level: int
+    ) -> None:
+        """五种小写等级名称应映射到对应的标准库等级。"""
+
+        logger = create_logger(
+            logger_name,
+            console=True,
+            persist=False,
+            console_level=level_name,
+        )
+        assert logger.level == expected_level
+        assert logger.handlers[0].level == expected_level
+
+    @pytest.mark.parametrize(
+        ("console_level", "persist_level", "field_name"),
+        [
+            ("INFO", "info", "console_level"),
+            ("warn", "info", "console_level"),
+            ("info", "ERROR", "persist_level"),
+            ("info", "notset", "persist_level"),
+        ],
+    )
+    def test_output_level_rejects_unsupported_names(
+        self,
+        logger_name: str,
+        tmp_path: Path,
+        console_level: str,
+        persist_level: str,
+        field_name: str,
+    ) -> None:
+        """大写、别名和未开放等级应在公开入口被拒绝。"""
+
+        with pytest.raises(ValueError, match=field_name):
+            create_logger(
+                logger_name,
+                console=True,
+                persist=True,
+                console_level=console_level,
+                persist_level=persist_level,
+                log_dir=tmp_path,
+                max_bytes=1024,
+                backup_count=2,
+            )
+
+    @pytest.mark.parametrize(
+        ("console_level", "persist_level", "field_name"),
+        [
+            (logging.INFO, "info", "console_level"),
+            ("info", logging.INFO, "persist_level"),
+        ],
+    )
+    def test_output_level_rejects_non_string_values(
+        self,
+        logger_name: str,
+        tmp_path: Path,
+        console_level: object,
+        persist_level: object,
+        field_name: str,
+    ) -> None:
+        """logging 数值常量不能绕过仅接受字符串的公共契约。"""
+
+        with pytest.raises(TypeError, match=field_name):
+            create_logger(
+                logger_name,
+                console=True,
+                persist=True,
+                console_level=console_level,
+                persist_level=persist_level,
+                log_dir=tmp_path,
+                max_bytes=1024,
+                backup_count=2,
+            )
 
     @pytest.mark.parametrize(
         ("max_bytes", "backup_count", "field_name"),

@@ -12,14 +12,15 @@
 
 - Logger 名称；
 - 是否输出到终端；
+- 终端输出的最低日志等级；
 - 是否持久化日志；
+- 持久化日志的最低日志等级；
 - 持久化目录；
 - 单个日志文件的最大字节数；
 - 最大轮转备份数量。
 
 以下行为由包固定，不提供配置入口：
 
-- 最低日志等级为 `INFO`；
 - 文件格式为 UTF-8 JSONL；
 - 时间为 UTC ISO 8601；
 - 文件名为 `<Logger名称>.jsonl`；
@@ -108,11 +109,22 @@ pay_logger = create_logger(
     "pay",
     console=True,
     persist=True,
+    console_level="warning",
+    persist_level="debug",
     log_dir="logs",
     max_bytes=10 * 1024 * 1024,
     backup_count=5,
 )
 ```
+
+`console_level` 和 `persist_level` 分别控制终端和文件 Handler 的最低输出等级，默认
+均为 `"info"`。只接受 `"debug"`、`"info"`、`"warning"`、`"error"` 和
+`"critical"` 五种小写字符串；大写名称、别名、`"notset"` 和 logging 数值常量
+都会被拒绝。两路输出可以采用不同等级，例如上面的终端输出 `WARNING` 及以上日志，
+文件从 `DEBUG` 开始持久化。
+
+某一路输出关闭时，其等级参数仍会接受合法性校验，但不会影响实际输出和同名 Logger
+的配置比较。
 
 当 `persist=True` 时，`log_dir`、`max_bytes` 和 `backup_count` 都是必需参数。日志
 目录不存在时会自动创建；由于文件 Handler 使用延迟打开，具体 JSONL 文件会在第一
@@ -253,6 +265,8 @@ def main() -> None:
         "general",
         console=True,
         persist=True,
+        console_level="warning",
+        persist_level="info",
         log_dir="logs",
         max_bytes=10 * 1024 * 1024,
         backup_count=5,
@@ -285,13 +299,15 @@ def create_order(logger: logging.Logger) -> None:
 
 ```text
 业务调用 Logger.info() / Logger.exception()
-  → Logger 固定 INFO 等级初筛
+  → Logger 按已启用 Handler 中的最低等级初筛
   → 创建 LogRecord
   → Filter 校验扩展字段和 data 字典类型
   ├── 可选终端 Handler
+  │     → 按 console_level 过滤
   │     → JSON Formatter 补齐固定字段，终端 Formatter 按需着色
   │     → 标准输出
   └── 可选轮转文件 Handler
+        → 按 persist_level 过滤
         → JSON Formatter 补齐固定字段
         → <Logger名称>.jsonl
 ```
@@ -343,8 +359,8 @@ uv build
 
 测试依赖 `pytest` 放在 `dev` 依赖组，沿用原有测试目录和场景。Fixture 为每个测试分配
 独立 Logger 名称，并在临时目录清理前关闭 Handler。新增场景验证 `root` 名称保护、
-祖先传播隔离、并发首次创建、目录失败清理和示例导入行为。项目尚未配置类型检查器与
-linter。
+祖先传播隔离、两路日志等级、并发首次创建、目录失败清理和示例导入行为。项目尚未
+配置类型检查器与 linter。
 
 `pyproject.toml` 显式声明了包发现规则：
 

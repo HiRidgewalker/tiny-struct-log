@@ -1,10 +1,46 @@
 """在公开创建边界校验 Logger 参数，并保存不可变的规范化配置。"""
 
+import logging
 import re
 from dataclasses import dataclass
+from enum import IntEnum
 from pathlib import Path
+from typing import Literal
 
 _LOGGER_NAME_PATTERN = r"[A-Za-z0-9][A-Za-z0-9_.-]*\Z"
+_LogLevelName = Literal["debug", "info", "warning", "error", "critical"]
+
+
+class _LogLevel(IntEnum):
+    """保存公共等级名称对应的标准库 logging 数值。"""
+
+    DEBUG = logging.DEBUG
+    INFO = logging.INFO
+    WARNING = logging.WARNING
+    ERROR = logging.ERROR
+    CRITICAL = logging.CRITICAL
+
+    @classmethod
+    def from_name(cls, level_name: _LogLevelName, field_name: str) -> "_LogLevel":
+        """把严格的小写等级名称转换为 logging 使用的数值等级。"""
+
+        if not isinstance(level_name, str):
+            raise TypeError(f"{field_name} 必须是字符串")
+        match level_name:
+            case "debug":
+                return cls.DEBUG
+            case "info":
+                return cls.INFO
+            case "warning":
+                return cls.WARNING
+            case "error":
+                return cls.ERROR
+            case "critical":
+                return cls.CRITICAL
+            case _:
+                raise ValueError(
+                    f"{field_name} 必须是 debug、info、warning、error 或 critical"
+                )
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -14,6 +50,8 @@ class _LoggerConfiguration:
     name: str
     console: bool
     persist: bool
+    console_level: _LogLevel | None
+    persist_level: _LogLevel | None
     log_dir: Path | None
     max_bytes: int | None
     backup_count: int | None
@@ -25,11 +63,13 @@ class _LoggerConfiguration:
         *,
         console: bool,
         persist: bool,
+        console_level: _LogLevelName,
+        persist_level: _LogLevelName,
         log_dir: str | Path | None,
         max_bytes: int | None,
         backup_count: int | None,
     ) -> "_LoggerConfiguration":
-        """校验六项公开参数，在访问 logging 共享状态前拒绝无效请求。"""
+        """校验八项公开参数，在访问 logging 共享状态前拒绝无效请求。"""
 
         cls._validate_name(name)
         if not isinstance(console, bool):
@@ -38,6 +78,9 @@ class _LoggerConfiguration:
             raise TypeError("persist 必须是布尔值")
         if not console and not persist:
             raise ValueError("console 和 persist 至少必须启用一个")
+
+        checked_console_level = _LogLevel.from_name(console_level, "console_level")
+        checked_persist_level = _LogLevel.from_name(persist_level, "persist_level")
 
         if not persist:
             if log_dir is not None or max_bytes is not None or backup_count is not None:
@@ -48,6 +91,8 @@ class _LoggerConfiguration:
                 name=name,
                 console=console,
                 persist=persist,
+                console_level=checked_console_level,
+                persist_level=None,
                 log_dir=None,
                 max_bytes=None,
                 backup_count=None,
@@ -67,10 +112,15 @@ class _LoggerConfiguration:
         # 在创建入口固定相对路径和用户目录的含义，后续工作目录变化不会改变同名
         # Logger 的配置比较结果，也不会让文件输出临时转向另一个目录。
         normalized_directory = Path(log_dir).expanduser().resolve()
+        configured_console_level: _LogLevel | None = checked_console_level
+        if not console:
+            configured_console_level = None
         return cls(
             name=name,
             console=console,
             persist=persist,
+            console_level=configured_console_level,
+            persist_level=checked_persist_level,
             log_dir=normalized_directory,
             max_bytes=checked_max_bytes,
             backup_count=checked_backup_count,

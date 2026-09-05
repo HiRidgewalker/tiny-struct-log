@@ -104,6 +104,51 @@ class TestStructuredOutputFunctional:
         records = _read_json_lines(tmp_path / f"{logger_name}.jsonl")
         assert records[0]["msg"] == "只写文件"
 
+    @pytest.mark.parametrize(
+        ("console_level", "persist_level", "console_messages", "file_messages"),
+        [
+            ("warning", "debug", ["warning", "error"],
+             ["debug", "info", "warning", "error"]),
+            ("debug", "error", ["debug", "info", "warning", "error"],
+             ["error"]),
+        ],
+    )
+    def test_console_and_file_levels_filter_independently(
+        self,
+        logger_name: str,
+        tmp_path: Path,
+        console_level: str,
+        persist_level: str,
+        console_messages: list[str],
+        file_messages: list[str],
+    ) -> None:
+        """终端和文件应分别按自己的等级筛选同一批 LogRecord。"""
+
+        with io.StringIO() as terminal:
+            with redirect_stdout(terminal):
+                logger = create_logger(
+                    logger_name,
+                    console=True,
+                    persist=True,
+                    console_level=console_level,
+                    persist_level=persist_level,
+                    log_dir=tmp_path,
+                    max_bytes=4096,
+                    backup_count=2,
+                )
+                logger.debug("debug")
+                logger.info("info")
+                logger.warning("warning")
+                logger.error("error")
+            console_records = [
+                json.loads(line) for line in terminal.getvalue().splitlines()
+            ]
+
+        file_records = _read_json_lines(tmp_path / f"{logger_name}.jsonl")
+        assert logger.level == logging.DEBUG
+        assert [record["msg"] for record in console_records] == console_messages
+        assert [record["msg"] for record in file_records] == file_messages
+
     def test_exception_chain_stays_in_one_json_line(
         self, logger_name: str, tmp_path: Path
     ) -> None:

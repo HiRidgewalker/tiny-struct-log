@@ -5,7 +5,7 @@ import threading
 from contextlib import ExitStack
 from pathlib import Path
 
-from .configuration import _LoggerConfiguration
+from .configuration import _LoggerConfiguration, _LogLevelName
 from .filters import _FixedFieldsFilter
 from .formatters import _JSONLineFormatter
 from .handlers import _LogOutputs
@@ -64,7 +64,10 @@ class _LoggerSetup:
         # 此时尚未修改 Logger，异常原样向上传递，调用方可以修正目录后重新创建。
         with ExitStack() as cleanup:
             if configuration.console:
-                console_handler = _LogOutputs.create_console(formatter)
+                assert configuration.console_level is not None
+                console_handler = _LogOutputs.create_console(
+                    formatter, configuration.console_level
+                )
                 cleanup.callback(console_handler.close)
                 output_handlers.append(console_handler)
             if configuration.persist:
@@ -72,17 +75,22 @@ class _LoggerSetup:
                 assert configuration.log_dir is not None
                 assert configuration.max_bytes is not None
                 assert configuration.backup_count is not None
+                assert configuration.persist_level is not None
                 log_path = configuration.log_dir / f"{configuration.name}.jsonl"
                 file_handler = _LogOutputs.create_file(
                     log_path,
                     configuration.max_bytes,
                     configuration.backup_count,
                     formatter,
+                    configuration.persist_level,
                 )
                 cleanup.callback(file_handler.close)
                 output_handlers.append(file_handler)
 
-            logger.setLevel(logging.INFO)
+            # Logger 必须先放行两个 Handler 中较低的等级，再由各 Handler 独立过滤。
+            # 例如终端为 warning、文件为 debug 时，DEBUG 记录仍要到达文件 Handler。
+            logger_level = min(handler.level for handler in output_handlers)
+            logger.setLevel(logger_level)
             logger.disabled = False
             # 点分名称也可能有业务父 Logger。False 会同时阻止向父 Logger 和根
             # Logger 传播；各 Handler 只负责当前 Logger 自己的输出目标。
@@ -103,15 +111,18 @@ def create_logger(
     *,
     console: bool,
     persist: bool,
+    console_level: _LogLevelName = "info",
+    persist_level: _LogLevelName = "info",
     log_dir: str | Path | None = None,
     max_bytes: int | None = None,
     backup_count: int | None = None,
 ) -> logging.Logger:
-    """创建或复用固定 INFO 等级、禁止向上传播的结构化 Logger。
+    """创建或复用支持独立输出等级、禁止向上传播的结构化 Logger。
 
     名称同时决定 JSON 的 module 字段和 <log_dir>/<name>.jsonl 文件名；
     保留名称 root 始终被拒绝。创建及同配置复用均设置 propagate=False，
     使日志只经过自身的 Handler，不交给父 Logger 或根 Logger。
+    终端和文件等级只接受五种标准小写名称，默认均为 info。
     业务扩展信息继续使用标准库的 extra={"data": {...}} 入口。
     """
 
@@ -119,6 +130,8 @@ def create_logger(
         name,
         console=console,
         persist=persist,
+        console_level=console_level,
+        persist_level=persist_level,
         log_dir=log_dir,
         max_bytes=max_bytes,
         backup_count=backup_count,
